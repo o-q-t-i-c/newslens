@@ -1,0 +1,10 @@
+{
+  "name": "NewsLens",
+  "short_name": "NewsLens",
+  "description": "同じニュース、違う伝え方。既成メディアと独立系メディアの報道を比較",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fafaf8",
+  "theme_color": "#fafaf8",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
