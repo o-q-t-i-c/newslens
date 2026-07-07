@@ -59,30 +59,36 @@
     background: var(--card); border: 1px solid var(--line); border-radius: 12px;
     padding: 16px; margin-bottom: 12px;
   }
-  .head { display: flex; gap: 12px; }
+  .head { display: flex; gap: 12px; flex-direction: row; }
   .head .txt { flex: 1; min-width: 0; }
   .chips { display: flex; gap: 8px; margin-bottom: 6px; align-items: baseline; }
   .chip { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 8px; background: #f0efe9; color: #6b6960; }
   .chip.time { background: transparent; color: var(--muted); font-weight: 400; padding: 0; }
   .topic h2 { font-size: 15.5px; font-weight: 700; line-height: 1.5; }
   .thumb {
-    flex-shrink: 0; width: 92px; height: 68px; border-radius: 8px;
-    object-fit: cover; background: var(--line);
+    flex-shrink: 0; width: 122px; height: 92px; border-radius: 8px;
+    object-fit: cover; background: var(--line); /* 右側配置(主要ニュースアプリの慣行に合わせる) */
+    align-self: flex-start;
   }
 
   /* シグネチャ:媒体カバレッジ表 */
-  .coverage { margin-top: 12px; display: grid; gap: 5px; }
-  .cov-row { display: flex; align-items: center; gap: 8px; }
-  .cov-label { flex-shrink: 0; width: 86px; font-size: 10.5px; color: var(--muted); letter-spacing: .02em; }
-  .cov-icons { display: flex; gap: 6px; flex-wrap: wrap; }
+  .coverage { margin-top: 12px; display: grid; gap: 8px; }
+  .cov-row { display: grid; gap: 3px; }
+  .cov-label { font-size: 10.5px; color: var(--muted); letter-spacing: .02em; }
+  .cov-icons { display: flex; gap: 4px; flex-wrap: wrap; }
   .cov {
-    width: 22px; height: 22px; border-radius: 6px; overflow: hidden;
-    border: 1.5px solid var(--line); background: #fff;
-    display: grid; place-items: center; position: relative;
+    display: grid; justify-items: center; gap: 2px; width: 52px;
   }
-  .cov img { width: 15px; height: 15px; object-fit: contain; }
-  .cov.off img { filter: grayscale(1); opacity: .22; }
-  .cov.on { border-color: var(--covered); }
+  .cov .icon {
+    width: 32px; height: 32px; border-radius: 8px; overflow: hidden;
+    border: 1.5px solid var(--line); background: #fff;
+    display: grid; place-items: center;
+  }
+  .cov .icon img { width: 22px; height: 22px; object-fit: contain; }
+  .cov .nm { font-size: 9px; color: var(--ink); line-height: 1.2; text-align: center; white-space: nowrap; overflow: hidden; max-width: 52px; }
+  .cov.off .icon img { filter: grayscale(1); opacity: .25; }
+  .cov.off .nm { color: #c6c4bc; }
+  .cov.on .icon { border-color: var(--covered); }
   .cov-note { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
   .meta { font-size: 12px; color: var(--muted); margin-top: 8px; }
@@ -154,7 +160,7 @@
     return `${Math.round(min / 1440)}日前`;
   };
   const favicon = (domain) =>
-    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
 
   const CATS = [
     { id: "all",      label: "すべて" },
@@ -163,7 +169,6 @@
     { id: "world",    label: "国際" },
     { id: "society",  label: "社会" },
     { id: "tech",     label: "IT・科学" },
-    { id: "sports",   label: "スポーツ" },
     { id: "other",    label: "その他" },
   ];
   const FILTERS = [
@@ -204,7 +209,8 @@
         <span class="cov-label">${g.label}</span>
         <span class="cov-icons">${list.map((o) => `
           <span class="cov ${covered.has(o.id) ? "on" : "off"}" title="${esc(o.name)}${covered.has(o.id) ? "" : ":未確認"}">
-            <img src="${favicon(o.domain)}" alt="${esc(o.name)}" loading="lazy">
+            <span class="icon"><img src="${favicon(o.domain)}" alt="${esc(o.name)}" loading="lazy"></span>
+            <span class="nm">${esc(o.name)}</span>
           </span>`).join("")}</span>
       </div>`;
     }).join("") + `</div>`;

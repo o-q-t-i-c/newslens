@@ -39,7 +39,6 @@ const FEEDS = [
   { outlet: "nhk", cat: "world",    url: "https://www3.nhk.or.jp/rss/news/cat6.xml" },
   { outlet: "nhk", cat: "society",  url: "https://www3.nhk.or.jp/rss/news/cat1.xml" },
   { outlet: "nhk", cat: "tech",     url: "https://www3.nhk.or.jp/rss/news/cat3.xml" },
-  { outlet: "nhk", cat: "sports",   url: "https://www3.nhk.or.jp/rss/news/cat7.xml" },
   // 総合フィード(キーワードで自動分類)
   { outlet: "asahi",    cat: null, url: "https://www.asahi.com/rss/asahi/newsheadlines.rdf" },
   { outlet: "yomiuri",  cat: null, url: "https://assets.wor.jp/rss/rdf/yomiuri/topstories.rdf" },
@@ -264,6 +263,7 @@ async function main() {
   const all = [...fresh, ...previous].filter((it) => {
     if (!it?.url || !it?.title) return false;
     if (!validOutletIds.has(it.outletId)) return false;
+    if (it.cat === "sports") return false; // 編集方針:スポーツは扱わない(比較価値が低いため)
     if (Date.parse(it.publishedAt) < cutoff) return false;
     if (seen.has(it.url)) return false;
     seen.add(it.url);
