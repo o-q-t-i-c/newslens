@@ -179,7 +179,7 @@ function cluster(items) {
       outletId,
       outletName: list[0].outletName,
       group: list[0].group,
-      articles: list.map(({ title, url, publishedAt }) => ({ title, url, publishedAt })),
+      articles: list.map(({ title, url, publishedAt, image }) => ({ title, url, publishedAt, image: image || "" })),
     }));
 
     // カテゴリ:記事の多数決(同数なら新しい記事優先)
@@ -200,6 +200,50 @@ function cluster(items) {
       outlets,
     };
   });
+}
+
+// ============================================================
+// OGP画像の取得
+// RSSに画像が無い記事は、記事ページのog:image(リンク共有用に
+// 媒体側が提供しているプレビュー画像)を取得する。
+// 負荷配慮:1回の実行で最大60件・同時8接続まで。取得結果は
+// data.jsonに蓄積されるので、30分ごとの実行で徐々に全記事に行き渡る。
+// ============================================================
+const OG_LIMIT_PER_RUN = 60;
+const OG_CONCURRENCY = 8;
+
+async function fetchOgImage(url) {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "NewsLensBot/0.3 (prototype; og-image fetch)" },
+      signal: AbortSignal.timeout(8000),
+      redirect: "follow",
+    });
+    if (!res.ok) return "";
+    const html = (await res.text()).slice(0, 200000); // 先頭だけで十分
+    const m = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+           || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+    if (!m) return "";
+    let img = m[1].replace(/&amp;/g, "&").trim();
+    if (img.startsWith("//")) img = "https:" + img;
+    return /^https?:\/\//.test(img) ? img : "";
+  } catch {
+    return "";
+  }
+}
+
+async function enrichImages(articles) {
+  const targets = articles.filter((a) => !a.image).slice(0, OG_LIMIT_PER_RUN);
+  if (!targets.length) return;
+  let done = 0;
+  for (let i = 0; i < targets.length; i += OG_CONCURRENCY) {
+    const batch = targets.slice(i, i + OG_CONCURRENCY);
+    await Promise.all(batch.map(async (a) => {
+      a.image = await fetchOgImage(a.url);
+      if (a.image) done++;
+    }));
+  }
+  console.log(`OGP画像: ${targets.length}件試行 → ${done}件取得`);
 }
 
 // ============================================================
@@ -249,7 +293,7 @@ async function main() {
             previous.push({
               title: a.title, url: a.url, publishedAt: a.publishedAt,
               outletId: o.outletId, outletName: o.outletName, group: o.group,
-              cat: t.cat, image: t.image || "",
+              cat: t.cat, image: a.image || "",
             });
           }
         }
@@ -269,6 +313,8 @@ async function main() {
     seen.add(it.url);
     return true;
   });
+
+  if (!useSample) await enrichImages(all);
 
   const topics = cluster(all).sort((a, b) =>
     b.outletCount - a.outletCount || Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
