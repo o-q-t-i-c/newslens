@@ -14,8 +14,8 @@
     --card: #ffffff;
     --line: #e6e4de;
     --muted: #8a8880;
-    --est: #2b4c7e;    /* 藍:既成メディア */
-    --indie: #c2452d;  /* 朱:独立系メディア */
+    --accent: #c2452d;
+    --covered: #1a1c20;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -34,65 +34,85 @@
     display: flex; align-items: baseline; justify-content: space-between;
   }
   .logo { font-weight: 800; font-size: 18px; letter-spacing: .04em; }
-  .logo span { color: var(--indie); }
+  .logo span { color: var(--accent); }
   .updated { font-size: 11px; color: var(--muted); }
 
-  /* フィルタタブ */
-  nav {
-    max-width: 640px; margin: 0 auto; padding: 0 12px 10px;
+  nav, .subnav {
+    max-width: 640px; margin: 0 auto; padding: 0 12px 8px;
     display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
   }
-  nav::-webkit-scrollbar { display: none; }
-  .tab {
-    flex-shrink: 0; font-family: inherit; font-size: 12.5px; font-weight: 600;
+  nav::-webkit-scrollbar, .subnav::-webkit-scrollbar { display: none; }
+  .subnav { padding-bottom: 10px; }
+  .tab, .chipbtn {
+    flex-shrink: 0; font-family: inherit; font-weight: 600;
     border: 1px solid var(--line); background: var(--card); color: var(--muted);
-    border-radius: 999px; padding: 5px 13px; cursor: pointer;
+    border-radius: 999px; cursor: pointer;
   }
+  .tab { font-size: 13px; padding: 5px 14px; }
   .tab.active { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .tab .n { font-weight: 400; opacity: .7; margin-left: 3px; }
+  .chipbtn { font-size: 11.5px; padding: 3px 11px; }
+  .chipbtn.active { background: #f1e5e2; border-color: var(--accent); color: var(--accent); }
 
   main { max-width: 640px; margin: 0 auto; padding: 12px 12px 60px; }
-  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); padding: 2px 4px 12px; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
-  .dot.est { background: var(--est); } .dot.indie { background: var(--indie); }
 
   .topic {
     background: var(--card); border: 1px solid var(--line); border-radius: 12px;
     padding: 16px; margin-bottom: 12px;
   }
-  .chips { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-  .chip {
-    font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 8px;
+  .head { display: flex; gap: 12px; }
+  .head .txt { flex: 1; min-width: 0; }
+  .chips { display: flex; gap: 8px; margin-bottom: 6px; align-items: baseline; }
+  .chip { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 8px; background: #f0efe9; color: #6b6960; }
+  .chip.time { background: transparent; color: var(--muted); font-weight: 400; padding: 0; }
+  .topic h2 { font-size: 15.5px; font-weight: 700; line-height: 1.5; }
+  .thumb {
+    flex-shrink: 0; width: 92px; height: 68px; border-radius: 8px;
+    object-fit: cover; background: var(--line);
   }
-  .chip.both { background: #eef1f6; color: var(--est); }
-  .chip.indieOnly { background: #f9ece9; color: var(--indie); }
-  .chip.estOnly { background: #eef1f6; color: var(--est); }
-  .chip.time { background: transparent; color: var(--muted); font-weight: 400; padding-left: 0; }
-  .topic h2 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
 
-  /* シグネチャ:報道バランスバー */
-  .balance { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 6px; background: var(--line); }
-  .balance .est { background: var(--est); } .balance .indie { background: var(--indie); }
-  .meta { font-size: 12px; color: var(--muted); }
+  /* シグネチャ:媒体カバレッジ表 */
+  .coverage { margin-top: 12px; display: grid; gap: 5px; }
+  .cov-row { display: flex; align-items: center; gap: 8px; }
+  .cov-label { flex-shrink: 0; width: 86px; font-size: 10.5px; color: var(--muted); letter-spacing: .02em; }
+  .cov-icons { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cov {
+    width: 22px; height: 22px; border-radius: 6px; overflow: hidden;
+    border: 1.5px solid var(--line); background: #fff;
+    display: grid; place-items: center; position: relative;
+  }
+  .cov img { width: 15px; height: 15px; object-fit: contain; }
+  .cov.off img { filter: grayscale(1); opacity: .22; }
+  .cov.on { border-color: var(--covered); }
+  .cov-note { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
-  .articles { display: none; border-top: 1px solid var(--line); margin-top: 12px; padding-top: 6px; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  .articles { display: none; border-top: 1px solid var(--line); margin-top: 12px; padding-top: 4px; }
   .topic.open .articles { display: block; }
-  .article { display: flex; gap: 10px; padding: 9px 0; text-decoration: none; color: inherit; align-items: baseline; }
-  .article + .article { border-top: 1px dashed var(--line); }
-  .badge {
-    flex-shrink: 0; font-size: 11px; font-weight: 700; color: #fff;
-    border-radius: 4px; padding: 1px 7px; white-space: nowrap;
-  }
-  .badge.est { background: var(--est); } .badge.indie { background: var(--indie); }
-  .article .t { font-size: 13.5px; }
+  .outlet-block { padding: 9px 0; }
+  .outlet-block + .outlet-block { border-top: 1px dashed var(--line); }
+  .article { display: flex; gap: 10px; text-decoration: none; color: inherit; align-items: baseline; }
   .article:hover .t { text-decoration: underline; }
+  .article .t { font-size: 13.5px; }
+  .badge {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 700; color: #444;
+    background: #f0efe9; border-radius: 4px; padding: 1px 8px 1px 5px; white-space: nowrap;
+  }
+  .badge img { width: 13px; height: 13px; }
+  .more-arts { margin: 6px 0 0 0; }
+  .more-arts summary { font-size: 11.5px; color: var(--muted); cursor: pointer; list-style: none; }
+  .more-arts summary::before { content: "▸ "; }
+  .more-arts[open] summary::before { content: "▾ "; }
+  .more-arts .article { padding-top: 7px; }
+
   .toggle {
     width: 100%; background: none; border: none; color: var(--muted);
     font-size: 12px; padding: 8px 0 0; cursor: pointer; font-family: inherit;
   }
-  .toggle:focus-visible, .tab:focus-visible { outline: 2px solid var(--est); outline-offset: 2px; }
+  .toggle:focus-visible, .tab:focus-visible, .chipbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .empty { text-align: center; color: var(--muted); padding: 60px 0; font-size: 14px; }
-  footer { text-align: center; font-size: 11px; color: var(--muted); padding: 20px; }
+  footer { max-width: 640px; margin: 0 auto; text-align: center; font-size: 11px; color: var(--muted); padding: 20px 16px; line-height: 1.8; }
 </style>
 </head>
 <body>
@@ -101,20 +121,19 @@
     <div class="logo">News<span>Lens</span></div>
     <div class="updated" id="updated"></div>
   </div>
-  <nav id="tabs"></nav>
+  <nav id="cats"></nav>
+  <div class="subnav" id="filters"></div>
 </header>
 <main>
-  <div class="legend">
-    <span><i class="dot est"></i>既成メディア</span>
-    <span><i class="dot indie"></i>独立系メディア</span>
-  </div>
   <div id="feed"><div class="empty">読み込み中…</div></div>
 </main>
-<footer>NewsLens プロトタイプ — 見出しの著作権は各媒体に帰属します</footer>
+<footer>
+  グレーの媒体アイコンは「この期間のフィードで掲載を確認できなかった」ことを示します(報道していないと断定するものではありません)。<br>
+  NewsLens プロトタイプ — 見出し・画像の著作権は各媒体に帰属します
+</footer>
 <script>
 (async () => {
   const feed = document.getElementById("feed");
-  const tabsEl = document.getElementById("tabs");
   let data;
   try {
     data = await (await fetch("data.json?t=" + Date.now())).json();
@@ -127,84 +146,128 @@
     new Date(data.generatedAt).toLocaleString("ja-JP",
       { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) + " 更新";
 
-  const esc = (s) => s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
   const rel = (iso) => {
     const min = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
     if (min < 60) return `${min}分前`;
     if (min < 1440) return `${Math.round(min / 60)}時間前`;
     return `${Math.round(min / 1440)}日前`;
   };
-  const covLabel = { both: "両サイドが報道", indieOnly: "独立系のみが報道", estOnly: "既成のみが報道" };
+  const favicon = (domain) =>
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
 
-  const TABS = [
-    { id: "all",       label: "すべて",        f: () => true },
-    { id: "both",      label: "両サイド比較",   f: (t) => t.coverage === "both" },
-    { id: "indieOnly", label: "独立系のみ",     f: (t) => t.coverage === "indieOnly" },
-    { id: "estOnly",   label: "既成のみ",       f: (t) => t.coverage === "estOnly" },
+  const CATS = [
+    { id: "all",      label: "すべて" },
+    { id: "politics", label: "政治" },
+    { id: "economy",  label: "経済" },
+    { id: "world",    label: "国際" },
+    { id: "society",  label: "社会" },
+    { id: "tech",     label: "IT・科学" },
+    { id: "sports",   label: "スポーツ" },
+    { id: "other",    label: "その他" },
   ];
-  let active = "all";
+  const FILTERS = [
+    { id: "all",    label: "すべて",           f: () => true },
+    { id: "multi",  label: "見比べられる(2媒体以上)", f: (t) => t.outletCount >= 2 },
+    { id: "single", label: "単独報道",          f: (t) => t.outletCount === 1 },
+  ];
+  let activeCat = "all", activeFilter = "all";
 
-  function renderTabs() {
-    tabsEl.innerHTML = TABS.map((tab) => {
-      const n = data.topics.filter(tab.f).length;
-      return `<button class="tab ${tab.id === active ? "active" : ""}" data-tab="${tab.id}">
-        ${tab.label}<span class="n">${n}</span></button>`;
+  const catLabel = Object.fromEntries(CATS.map((c) => [c.id, c.label]));
+  const groups = [
+    { id: "press", label: "新聞・通信・放送" },
+    { id: "web",   label: "ウェブメディア" },
+  ];
+
+  function visibleTopics() {
+    const f = FILTERS.find((x) => x.id === activeFilter).f;
+    return data.topics.filter((t) => (activeCat === "all" || t.cat === activeCat) && f(t));
+  }
+
+  function renderNav() {
+    document.getElementById("cats").innerHTML = CATS.map((c) => {
+      const n = data.topics.filter((t) => c.id === "all" || t.cat === c.id).length;
+      if (c.id !== "all" && n === 0) return "";
+      return `<button class="tab ${c.id === activeCat ? "active" : ""}" data-cat="${c.id}">${c.label}</button>`;
     }).join("");
+    document.getElementById("filters").innerHTML = FILTERS.map((f) =>
+      `<button class="chipbtn ${f.id === activeFilter ? "active" : ""}" data-filter="${f.id}">${f.label}</button>`
+    ).join("");
+  }
+
+  function coverageMatrix(t) {
+    const covered = new Set(t.outlets.map((o) => o.outletId));
+    return `<div class="coverage">` + groups.map((g) => {
+      const list = data.outlets.filter((o) => o.group === g.id);
+      if (!list.length) return "";
+      return `<div class="cov-row">
+        <span class="cov-label">${g.label}</span>
+        <span class="cov-icons">${list.map((o) => `
+          <span class="cov ${covered.has(o.id) ? "on" : "off"}" title="${esc(o.name)}${covered.has(o.id) ? "" : ":未確認"}">
+            <img src="${favicon(o.domain)}" alt="${esc(o.name)}" loading="lazy">
+          </span>`).join("")}</span>
+      </div>`;
+    }).join("") + `</div>`;
+  }
+
+  function articleRow(o, a) {
+    const outlet = data.outlets.find((x) => x.id === o.outletId) || {};
+    return `<a class="article" href="${esc(a.url)}" target="_blank" rel="noopener">
+      <span class="badge"><img src="${favicon(outlet.domain || "")}" alt="">${esc(o.outletName)}</span>
+      <span class="t">${esc(a.title)}</span>
+    </a>`;
   }
 
   function renderFeed() {
-    const tab = TABS.find((t) => t.id === active);
-    const topics = data.topics.filter(tab.f);
+    const topics = visibleTopics();
     if (!topics.length) {
-      feed.innerHTML = '<div class="empty">このカテゴリのトピックはまだありません。次の自動更新をお待ちください。</div>';
+      feed.innerHTML = '<div class="empty">この条件のトピックはまだありません。次の自動更新をお待ちください。</div>';
       return;
     }
-    feed.innerHTML = topics.map((t) => {
-      const total = t.estCount + t.indieCount;
-      const estPct = Math.round(t.estCount / total * 100);
-      const multi = t.articles.length > 1;
-      return `
+    feed.innerHTML = topics.map((t) => `
       <article class="topic">
-        <div class="chips">
-          <span class="chip ${t.coverage}">${covLabel[t.coverage]}</span>
-          <span class="chip time">${rel(t.updatedAt)}</span>
+        <div class="head">
+          <div class="txt">
+            <div class="chips">
+              <span class="chip">${catLabel[t.cat] || "その他"}</span>
+              <span class="chip time">${rel(t.updatedAt)} ・ ${t.outletCount}媒体</span>
+            </div>
+            <h2>${esc(t.topic)}</h2>
+          </div>
+          ${t.image ? `<img class="thumb" src="${esc(t.image)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
         </div>
-        <h2>${esc(t.topic)}</h2>
-        <div class="balance">
-          <div class="est" style="width:${estPct}%"></div>
-          <div class="indie" style="width:${100 - estPct}%"></div>
-        </div>
-        <div class="meta">${t.sourceCount}媒体 ・ 既成 ${t.estCount}件 / 独立系 ${t.indieCount}件</div>
+        ${coverageMatrix(t)}
         <div class="articles">
-          ${t.articles.map(a => `
-            <a class="article" href="${esc(a.url)}" target="_blank" rel="noopener">
-              <span class="badge ${a.camp}">${esc(a.sourceName)}</span>
-              <span class="t">${esc(a.title)}</span>
-            </a>`).join("")}
+          ${t.outlets.map((o) => {
+            const [first, ...rest] = o.articles;
+            return `<div class="outlet-block">
+              ${articleRow(o, first)}
+              ${rest.length ? `<details class="more-arts"><summary>続報など他${rest.length}件</summary>
+                ${rest.map((a) => articleRow(o, a)).join("")}</details>` : ""}
+            </div>`;
+          }).join("")}
         </div>
-        <button class="toggle">${multi ? "各社の伝え方を見る ▾" : "記事を見る ▾"}</button>
-      </article>`;
-    }).join("");
+        <button class="toggle">${t.outletCount > 1 ? "各社の伝え方を見る ▾" : "記事を見る ▾"}</button>
+      </article>`).join("");
   }
 
-  tabsEl.addEventListener("click", (e) => {
-    const btn = e.target.closest(".tab");
-    if (!btn) return;
-    active = btn.dataset.tab;
-    renderTabs(); renderFeed();
-    window.scrollTo({ top: 0 });
+  document.getElementById("cats").addEventListener("click", (e) => {
+    const btn = e.target.closest(".tab"); if (!btn) return;
+    activeCat = btn.dataset.cat; renderNav(); renderFeed(); window.scrollTo({ top: 0 });
   });
-
+  document.getElementById("filters").addEventListener("click", (e) => {
+    const btn = e.target.closest(".chipbtn"); if (!btn) return;
+    activeFilter = btn.dataset.filter; renderNav(); renderFeed(); window.scrollTo({ top: 0 });
+  });
   feed.addEventListener("click", (e) => {
-    const btn = e.target.closest(".toggle");
-    if (!btn) return;
+    const btn = e.target.closest(".toggle"); if (!btn) return;
     const card = btn.closest(".topic");
     card.classList.toggle("open");
     btn.textContent = card.classList.contains("open") ? "閉じる ▴"
-      : btn.textContent.replace("▴", "▾").replace("閉じる", "各社の伝え方を見る");
+      : (card.querySelectorAll(".outlet-block").length > 1 ? "各社の伝え方を見る ▾" : "記事を見る ▾");
   });
 
-  renderTabs(); renderFeed();
+  renderNav(); renderFeed();
 })();
 </script>
 </body>

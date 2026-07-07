@@ -1,41 +1,85 @@
-// NewsLens 収集スクリプト v2
-// - 各社RSSから記事を取得(依存ライブラリなし、Node 18+)
-// - 前回の data.json とマージして48時間分を蓄積
-// - IDF重み付きバイグラム類似度で同一トピックを自動クラスタリング
-// - 「独立系のみ / 既成のみ / 両サイド」を自動分類(ブラインドスポット検出)
-// 運営コスト:ゼロ(GitHub Actions + GitHub Pages 無料枠のみで動作)
+// NewsLens 収集スクリプト v3
+// - 媒体(OUTLETS)とフィード(FEEDS)を分離。カテゴリ別RSSを持つ媒体は複数フィードを登録
+// - カテゴリRSSが無い媒体はキーワードで自動分類
+// - RSS内の画像(media:thumbnail / enclosure / description内img)を抽出
+// - トピックごとに「どの媒体が報じたか」を集計(未掲載媒体の可視化はUI側で行う)
+// 運営コスト:ゼロ(GitHub Actions + GitHub Pages 無料枠のみ)
 
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 
 // ============================================================
-// 収集元
-// camp: "est" = 既成メディア / "indie" = 独立系Webメディア
-// RSSのURLは変わることがある。動かない媒体はログに✗が出るので、ここを直す。
+// 媒体の定義
+// group: "press" = 新聞・通信・放送 / "web" = ウェブメディア
+// domain はファビコン表示に使う
 // ============================================================
-const SOURCES = [
-  // --- 既成メディア ---
-  { id: "nhk",      name: "NHK",             camp: "est",   url: "https://www3.nhk.or.jp/rss/news/cat0.xml" },
-  { id: "asahi",    name: "朝日新聞",         camp: "est",   url: "https://www.asahi.com/rss/asahi/newsheadlines.rdf" },
-  { id: "yomiuri",  name: "読売新聞",         camp: "est",   url: "https://assets.wor.jp/rss/rdf/yomiuri/topstories.rdf" },
-  { id: "sankei",   name: "産経新聞",         camp: "est",   url: "https://assets.wor.jp/rss/rdf/sankei/flash.rdf" },
-  { id: "mainichi", name: "毎日新聞",         camp: "est",   url: "https://mainichi.jp/rss/etc/mainichi-flash.rss" },
-  { id: "jiji",     name: "時事通信",         camp: "est",   url: "https://www.jiji.com/rss/ranking.rdf" },
-  // --- 独立系Webメディア ---
-  { id: "huffpost", name: "ハフポスト",       camp: "indie", url: "https://www.huffingtonpost.jp/feeds/index.xml" },
-  { id: "bengoshi", name: "弁護士ドットコム", camp: "indie", url: "https://www.bengo4.com/topics/rss/index.xml" },
-  { id: "buzzfeed", name: "BuzzFeed Japan",  camp: "indie", url: "https://www.buzzfeed.com/jp.xml" },
-  { id: "gigazine", name: "GIGAZINE",        camp: "indie", url: "https://gigazine.net/news/rss_2.0/" },
-  { id: "itmedia",  name: "ITmedia",         camp: "indie", url: "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml" },
+const OUTLETS = [
+  { id: "nhk",      name: "NHK",             group: "press", domain: "www3.nhk.or.jp" },
+  { id: "asahi",    name: "朝日新聞",         group: "press", domain: "www.asahi.com" },
+  { id: "yomiuri",  name: "読売新聞",         group: "press", domain: "www.yomiuri.co.jp" },
+  { id: "sankei",   name: "産経新聞",         group: "press", domain: "www.sankei.com" },
+  { id: "mainichi", name: "毎日新聞",         group: "press", domain: "mainichi.jp" },
+  { id: "jiji",     name: "時事通信",         group: "press", domain: "www.jiji.com" },
+  { id: "huffpost", name: "ハフポスト",       group: "web",   domain: "www.huffingtonpost.jp" },
+  { id: "bengoshi", name: "弁護士ドットコム", group: "web",   domain: "www.bengo4.com" },
+  { id: "buzzfeed", name: "BuzzFeed Japan",  group: "web",   domain: "www.buzzfeed.com" },
+  { id: "gigazine", name: "GIGAZINE",        group: "web",   domain: "gigazine.net" },
+  { id: "itmedia",  name: "ITmedia",         group: "web",   domain: "www.itmedia.co.jp" },
 ];
 
-const MAX_AGE_HOURS = 48;          // 保持する記事の新しさ
-const SIMILARITY_THRESHOLD = 0.20; // 類似度の閾値(上げる=厳密、下げる=緩い)。実測でMERGE最小0.13/SPLIT最大0.07
+// ============================================================
+// フィードの定義
+// cat を指定したフィードの記事はそのカテゴリに確定。
+// cat: null のフィードはタイトルのキーワードで自動分類する。
+// カテゴリ: politics / economy / world / society / tech / sports / other
+// ============================================================
+const FEEDS = [
+  // NHK はカテゴリ別RSSが充実しているのでフル活用
+  { outlet: "nhk", cat: "politics", url: "https://www3.nhk.or.jp/rss/news/cat4.xml" },
+  { outlet: "nhk", cat: "economy",  url: "https://www3.nhk.or.jp/rss/news/cat5.xml" },
+  { outlet: "nhk", cat: "world",    url: "https://www3.nhk.or.jp/rss/news/cat6.xml" },
+  { outlet: "nhk", cat: "society",  url: "https://www3.nhk.or.jp/rss/news/cat1.xml" },
+  { outlet: "nhk", cat: "tech",     url: "https://www3.nhk.or.jp/rss/news/cat3.xml" },
+  { outlet: "nhk", cat: "sports",   url: "https://www3.nhk.or.jp/rss/news/cat7.xml" },
+  // 総合フィード(キーワードで自動分類)
+  { outlet: "asahi",    cat: null, url: "https://www.asahi.com/rss/asahi/newsheadlines.rdf" },
+  { outlet: "yomiuri",  cat: null, url: "https://assets.wor.jp/rss/rdf/yomiuri/topstories.rdf" },
+  { outlet: "sankei",   cat: null, url: "https://assets.wor.jp/rss/rdf/sankei/flash.rdf" },
+  { outlet: "mainichi", cat: null, url: "https://mainichi.jp/rss/etc/mainichi-flash.rss" },
+  { outlet: "jiji",     cat: null, url: "https://www.jiji.com/rss/ranking.rdf" },
+  { outlet: "huffpost", cat: null, url: "https://www.huffingtonpost.jp/feeds/index.xml" },
+  { outlet: "bengoshi", cat: null, url: "https://www.bengo4.com/topics/rss/index.xml" },
+  { outlet: "buzzfeed", cat: null, url: "https://www.buzzfeed.com/jp.xml" },
+  { outlet: "gigazine", cat: null, url: "https://gigazine.net/news/rss_2.0/" },
+  { outlet: "itmedia",  cat: null, url: "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml" },
+];
+
+const MAX_AGE_HOURS = 48;
+const SIMILARITY_THRESHOLD = 0.20; // 実測: MERGE最小0.13 / SPLIT最大0.07(v2で計測)
 const DATA_PATH = new URL("../docs/data.json", import.meta.url);
 
 // ============================================================
-// RSS / Atom 簡易パーサ
+// キーワードによるカテゴリ自動分類(カテゴリRSSが無い媒体用)
+// 上から順に判定し、最初に当たったカテゴリになる。
 // ============================================================
-function parseFeed(xml, source) {
+const CATEGORY_RULES = [
+  ["sports",   /野球|サッカー|Jリーグ|大リーグ|MLB|NBA|五輪|オリンピック|パラリンピック|選手権|W杯|ワールドカップ|大相撲|ゴルフ|テニス|駅伝|マラソン|プロ野球|甲子園|フィギュア/],
+  ["politics", /首相|内閣|政権|国会|衆院|参院|選挙|政党|自民|立憲|公明|維新|共産|大臣|官房|法案|閣議|知事選|市長選|子育て支援|少子化|防衛費|憲法/],
+  ["economy",  /日銀|株価|株式|円安|円高|為替|金利|利上げ|利下げ|物価|賃金|賃上げ|GDP|景気|貿易|関税|決算|上場|倒産|投資|税制|年金|値上げ|インフレ/],
+  ["world",    /米国|アメリカ|中国|韓国|北朝鮮|ロシア|ウクライナ|イスラエル|パレスチナ|ガザ|EU|国連|大統領|外相|外交|首脳|台湾|NATO|トランプ|中東/],
+  ["tech",     /\bAI\b|人工知能|半導体|スマホ|iPhone|アプリ|グーグル|Google|アップル|Apple|メタ|SNS|アルゴリズム|サイバー|宇宙|ロケット|研究チーム|ノーベル|量子|生成AI|チャットGPT|ChatGPT/i],
+  ["society",  /事件|事故|裁判|判決|逮捕|容疑|災害|地震|台風|豪雨|大雨|線状降水帯|猛暑|熱中症|噴火|火災|警察|検察|学校|いじめ|感染|医療|介護|保育/],
+];
+
+function classify(title) {
+  for (const [cat, re] of CATEGORY_RULES) if (re.test(title)) return cat;
+  return "other";
+}
+
+// ============================================================
+// RSS / Atom 簡易パーサ(画像抽出つき)
+// ============================================================
+function parseFeed(xml, feed) {
+  const outlet = OUTLETS.find((o) => o.id === feed.outlet);
   const items = [];
   const blocks = xml.match(/<item[\s>][\s\S]*?<\/item>|<entry[\s>][\s\S]*?<\/entry>/g) || [];
   for (const block of blocks) {
@@ -53,13 +97,25 @@ function parseFeed(xml, source) {
     if (!title || !link) continue;
     const ts = date ? Date.parse(date) : Date.now();
     if (Number.isNaN(ts)) continue;
+
+    // 画像:media:thumbnail → enclosure → 本文内<img> の順で探す
+    let image = "";
+    let m = block.match(/<media:thumbnail[^>]*url="([^"]+)"/) ||
+            block.match(/<media:content[^>]*url="([^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i) ||
+            block.match(/<enclosure[^>]*url="([^"]+)"[^>]*type="image\/[^"]*"/) ||
+            block.match(/<enclosure[^>]*type="image\/[^"]*"[^>]*url="([^"]+)"/) ||
+            block.match(/<img[^>]*src=["']?(https?:\/\/[^"'\s>]+)/i);
+    if (m) image = m[1].replace(/&amp;/g, "&");
+
     items.push({
       title,
       url: link.trim(),
       publishedAt: new Date(ts).toISOString(),
-      sourceId: source.id,
-      sourceName: source.name,
-      camp: source.camp,
+      outletId: outlet.id,
+      outletName: outlet.name,
+      group: outlet.group,
+      cat: feed.cat || classify(title),
+      image,
     });
   }
   return items;
@@ -73,10 +129,9 @@ function decode(s) {
 }
 
 // ============================================================
-// クラスタリング(文字バイグラムのoverlap係数 + 単一リンク法)
-// 注:IDF重み付けは試したが逆効果だった。同一事件の記事群では
-// トピック語(「日銀」「利上げ」等)こそが繰り返し現れるため、
-// IDFがその信号を減衰させてしまう。素のoverlapが最も安定。
+// クラスタリング(文字バイグラムoverlap係数 + 単一リンク法)
+// 注: IDF重み付けは実験の結果、逆効果と判明(同一事件の記事群では
+// トピック語が繰り返されるため、IDFがその信号を減衰させる)
 // ============================================================
 function bigrams(text) {
   const t = text.replace(/[\s、。「」『』【】()()\[\]・:;:!?!?…|/／-]/g, "");
@@ -89,7 +144,7 @@ function similarity(a, b) {
   if (a.size === 0 || b.size === 0) return 0;
   let inter = 0;
   for (const g of a) if (b.has(g)) inter++;
-  return inter / Math.min(a.size, b.size); // overlap係数(短いタイトルでも拾える)
+  return inter / Math.min(a.size, b.size);
 }
 
 function cluster(items) {
@@ -114,17 +169,36 @@ function cluster(items) {
   return clusters.map((members) => {
     const arts = members.map((m) => items[m])
       .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-    const estCount = arts.filter((a) => a.camp === "est").length;
-    const indieCount = arts.filter((a) => a.camp === "indie").length;
-    const sourceCount = new Set(arts.map((a) => a.sourceId)).size;
-    // 分類:both = 両サイドが報道 / indieOnly / estOnly
-    const coverage = estCount > 0 && indieCount > 0 ? "both"
-                   : indieCount > 0 ? "indieOnly" : "estOnly";
+
+    // 媒体ごとにまとめる(同一媒体の続報は代表1本+残りを束ねる)
+    const byOutlet = new Map();
+    for (const a of arts) {
+      if (!byOutlet.has(a.outletId)) byOutlet.set(a.outletId, []);
+      byOutlet.get(a.outletId).push(a);
+    }
+    const outlets = [...byOutlet.entries()].map(([outletId, list]) => ({
+      outletId,
+      outletName: list[0].outletName,
+      group: list[0].group,
+      articles: list.map(({ title, url, publishedAt }) => ({ title, url, publishedAt })),
+    }));
+
+    // カテゴリ:記事の多数決(同数なら新しい記事優先)
+    const catCount = new Map();
+    for (const a of arts) catCount.set(a.cat, (catCount.get(a.cat) || 0) + 1);
+    const cat = [...catCount.entries()].sort((x, y) => y[1] - x[1])[0][0];
+
+    // 画像:いちばん新しい記事の画像を採用
+    const image = (arts.find((a) => a.image) || {}).image || "";
+
     return {
       topic: arts[0].title,
       updatedAt: arts[0].publishedAt,
-      sourceCount, estCount, indieCount, coverage,
-      articles: arts,
+      cat,
+      image,
+      outletCount: outlets.length,
+      articleCount: arts.length,
+      outlets,
     };
   });
 }
@@ -132,19 +206,20 @@ function cluster(items) {
 // ============================================================
 // メイン
 // ============================================================
-async function fetchSource(source) {
+async function fetchFeed(feed) {
+  const outlet = OUTLETS.find((o) => o.id === feed.outlet);
   try {
-    const res = await fetch(source.url, {
-      headers: { "User-Agent": "NewsLensBot/0.2 (prototype)" },
+    const res = await fetch(feed.url, {
+      headers: { "User-Agent": "NewsLensBot/0.3 (prototype)" },
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const items = parseFeed(await res.text(), source);
-    console.log(`✓ ${source.name}: ${items.length}件`);
+    const items = parseFeed(await res.text(), feed);
+    console.log(`✓ ${outlet.name}${feed.cat ? `(${feed.cat})` : ""}: ${items.length}件`);
     return items;
   } catch (e) {
-    console.error(`✗ ${source.name}: ${e.message}`); // 1媒体の失敗で全体を止めない
-    return [];
+    console.error(`✗ ${outlet.name}${feed.cat ? `(${feed.cat})` : ""}: ${e.message}`);
+    return []; // 1フィードの失敗で全体を止めない
   }
 }
 
@@ -153,56 +228,60 @@ async function main() {
   let fresh = [];
 
   if (useSample) {
-    for (const s of SOURCES) {
+    for (const feed of FEEDS) {
       try {
-        const xml = readFileSync(new URL(`../sample-feeds/${s.id}.xml`, import.meta.url), "utf8");
-        fresh.push(...parseFeed(xml, s));
+        const xml = readFileSync(new URL(`../sample-feeds/${feed.outlet}.xml`, import.meta.url), "utf8");
+        fresh.push(...parseFeed(xml, { ...feed, cat: null }));
       } catch { /* サンプルの無い媒体はスキップ */ }
     }
+    // 同一媒体の複数フィードでサンプルを二重に読まないよう重複除去はこの後の処理に任せる
   } else {
-    fresh = (await Promise.all(SOURCES.map(fetchSource))).flat();
+    fresh = (await Promise.all(FEEDS.map(fetchFeed))).flat();
   }
 
-  // 前回データとマージ(RSSから消えた記事も48時間は保持し続ける)
+  // 前回データとマージ(RSSから消えた記事も48時間は保持)
   let previous = [];
   if (existsSync(DATA_PATH)) {
     try {
       const old = JSON.parse(readFileSync(DATA_PATH, "utf8"));
-      previous = (old.topics || []).flatMap((t) => t.articles || []);
-    } catch { /* 壊れていたら無視して新規作成 */ }
+      for (const t of old.topics || []) {
+        for (const o of t.outlets || []) {
+          for (const a of o.articles || []) {
+            previous.push({
+              title: a.title, url: a.url, publishedAt: a.publishedAt,
+              outletId: o.outletId, outletName: o.outletName, group: o.group,
+              cat: t.cat, image: t.image || "",
+            });
+          }
+        }
+      }
+    } catch { /* 壊れていたら無視 */ }
   }
 
-  const validSourceIds = new Set(SOURCES.map((s) => s.id));
+  const validOutletIds = new Set(OUTLETS.map((o) => o.id));
   const cutoff = Date.now() - MAX_AGE_HOURS * 3600 * 1000;
   const seen = new Set();
   const all = [...fresh, ...previous].filter((it) => {
     if (!it?.url || !it?.title) return false;
-    if (!validSourceIds.has(it.sourceId)) return false;      // 削除した媒体を排除
-    if (Date.parse(it.publishedAt) < cutoff) return false;    // 古い記事を排除
-    if (seen.has(it.url)) return false;                       // URL重複を排除
+    if (!validOutletIds.has(it.outletId)) return false;
+    if (Date.parse(it.publishedAt) < cutoff) return false;
+    if (seen.has(it.url)) return false;
     seen.add(it.url);
     return true;
   });
 
   const topics = cluster(all).sort((a, b) =>
-    b.sourceCount - a.sourceCount || Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+    b.outletCount - a.outletCount || Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 
   const output = {
     generatedAt: new Date().toISOString(),
-    sources: SOURCES.map(({ id, name, camp }) => ({ id, name, camp })),
-    stats: {
-      articles: all.length,
-      topics: topics.length,
-      both: topics.filter((t) => t.coverage === "both").length,
-      indieOnly: topics.filter((t) => t.coverage === "indieOnly").length,
-      estOnly: topics.filter((t) => t.coverage === "estOnly").length,
-    },
+    outlets: OUTLETS,
     topics,
   };
 
   writeFileSync(DATA_PATH, JSON.stringify(output));
-  console.log(`\n記事 ${all.length}件 → ${topics.length}トピック ` +
-    `(両サイド: ${output.stats.both} / 独立系のみ: ${output.stats.indieOnly} / 既成のみ: ${output.stats.estOnly})`);
+  const multi = topics.filter((t) => t.outletCount > 1).length;
+  console.log(`\n記事 ${all.length}件 → ${topics.length}トピック(複数媒体: ${multi})`);
 }
 
 main();
